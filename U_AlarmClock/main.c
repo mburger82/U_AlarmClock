@@ -38,7 +38,7 @@
 #define ALARMCLOCK_BUTTON_S4_SHORT		1<<14
 #define ALARMCLOCK_BUTTON_S4_LONG		1<<15
 #define ALARMCLOCK_BUTTON_ALL			0xFF00
-EventGroupHandle_t egAlarmClock;
+EventGroupHandle_t egAlarmClock = NULL;
 
 static struct {
 	int8_t seconds;
@@ -89,6 +89,9 @@ int main(void)
 void vLedBlink(void *pvParameters) {
 	PORTF.DIRSET = 0x0F;
 	PORTF.OUT = 0x0F;
+	while(egAlarmClock == NULL) {
+		vTaskDelay(1);
+	}
 	for(;;) {
 		xEventGroupWaitBits(egAlarmClock, ALARMCLOCK_ALARM_ON, pdFALSE, pdFALSE, portMAX_DELAY);
 		PORTF.OUTCLR = 0x0F;
@@ -100,11 +103,14 @@ void vLedBlink(void *pvParameters) {
 
 void vTimeTask(void *pvParameters) {
 	(void) pvParameters;
+	
+	egAlarmClock = xEventGroupCreate();
+
 	TCD0.CTRLA = TC_CLKSEL_DIV1024_gc ;
 	TCD0.CTRLB = 0x00;
 	TCD0.INTCTRLA = 0x03;
 	TCD0.PER = 31250-1;
-	egAlarmClock = xEventGroupCreate();
+
 	globalTimeStorage.hours = 18;
 	globalTimeStorage.minutes = 15;
 	globalTimeStorage.seconds = 0;
@@ -230,7 +236,7 @@ bool checkIfAlarm() {
 	(globalAlarmStorage.minutes == globalTimeStorage.minutes) &&
 	(globalAlarmStorage.seconds == globalTimeStorage.seconds)) {
 		return true;
-		} else {
+	} else {
 		return false;
 	}
 }
@@ -242,6 +248,9 @@ void vMMITask(void *pvParameters) {
 	static uint8_t alarmState = 0;
 	uint16_t buttonstate = 0x0000;
 	PORTE.DIRSET = 0x08;
+	while(egAlarmClock == NULL) {
+		vTaskDelay(1);
+	}
 	for(;;) {
 		PORTE.OUTCLR = 0x08;
 		buttonstate = xEventGroupGetBits(egAlarmClock);
@@ -329,6 +338,9 @@ void vMMITask(void *pvParameters) {
 }
 void vButtonTask(void *pvParameters){
 	(void) pvParameters;
+	while(egAlarmClock == NULL) {
+		vTaskDelay(1);
+	}
 	initButtons();
 	for(;;) {
 		updateButtons();
